@@ -1,0 +1,123 @@
+---
+title: "Practical Machine Learning Project"
+author: "Anh"
+date: "2/4/2022"
+output: pdf_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit is now possible to 
+collect a large amount of data about personal activity relatively inexpensively. 
+These type of devices are part of the quantified self movement – a group of 
+enthusiasts who take measurements about themselves regularly to improve their 
+health, to find patterns in their behavior, or because they are tech geeks. One 
+thing that people regularly do is quantify how much of a particular activity 
+they do, but they rarely quantify how well they do it.
+
+# Data processing
+## Importing data
+```{r message = FALSE, warning = FALSE}
+# Load necessary packages
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(repmis)
+```
+```{r message = FALSE, warning = FALSE}
+# Load data locally
+df_train = read.csv("pml-training.csv", na.strings = c("NA", ""))
+df_test = read.csv("pml-testing.csv", na.strings = c("NA", ""))
+dim(df_train)
+dim(df_test)
+```
+From the dim functions, we can see that the training dataset has 19622 
+observations and 160 variables, and the testing data set contains 20 
+observations and the same variables as the training set. We are trying to 
+predict the outcome of the variable `classe` in the training set.
+
+## Cleaning data
+```{r message = FALSE, warning = FALSE}
+# delete columns of the training set that contain any missing values
+train = df_train[, colSums(is.na(df_train)) == 0]
+test = df_test[, colSums(is.na(df_test)) == 0]
+
+# delete the first seven weak predictors 
+train = train[, -c(1:7)]
+test = test[, -c(1:7)]
+```
+## Spliting data
+To get out-of-sample errors, we split the cleaned training set `train` into a 
+training set (`train_data`, 70%) for prediction and a validation set 
+(`valid_data` 30%) to compute the out-of-sample errors.
+
+```{r message = FALSE, warning = FALSE}
+set.seed(7826) 
+inTrain <- createDataPartition(train$classe, p = 0.7, list = FALSE)
+train_data <- train[inTrain, ]
+valid_data <- train[-inTrain, ]
+```
+# Prediction algorithms
+## Classification trees
+Since data transformations are not necessarily important in non-linear models 
+like classification trees, we do not transform any variables.
+
+```{r message = FALSE, warning = FALSE}
+control <- trainControl(method = "cv", number = 5)
+fit_rpart <- train(classe ~ ., data = train_data, method = "rpart", 
+                   trControl = control)
+print(fit_rpart, digits = 4)
+```
+```{r message = FALSE, warning = FALSE}
+fancyRpartPlot(fit_rpart$finalModel)
+```
+```{r message = FALSE, warning = FALSE}
+# predict outcomes using validation set
+predict_rpart <- predict(fit_rpart, valid_data)
+# Show prediction result
+(conf_rpart <- confusionMatrix(as.factor(valid_data$classe), predict_rpart))
+```
+
+```{r message = FALSE, warning = FALSE}
+(accuracy_rpart <- conf_rpart$overall[1])
+```
+Accuracy rate is 0.5, and so the out-of-sample error rate is 0.5. Therefore, 
+using classification tree does not predict the outcome `classe` very well.
+
+## Random forests
+
+```{r message = FALSE, warning = FALSE}
+fit_rf <- train(classe ~ ., data = train_data, method = "rf", 
+                   trControl = control)
+print(fit_rf, digits = 4)
+```
+
+```{r message = FALSE, warning = FALSE}
+# predict outcomes using validation set
+predict_rf <- predict(fit_rf, valid_data)
+# Show prediction result
+(conf_rf <- confusionMatrix(as.factor(valid_data$classe), predict_rf))
+```
+
+```{r message = FALSE, warning = FALSE}
+(accuracy_rf <- conf_rf$overall[1])
+```
+The accuracy rate is 0.991, and so the out-of-sample error rate is 0.009. This 
+may be due to the fact that many predictors in the dataset are highly correlated. 
+Random forests choose a subset of predictors at each split and decorrelate the 
+trees. This leads to high accuracy, although this algorithm is sometimes 
+difficult to interpret and computationally inefficient.
+
+# Prediction on test set
+```{r message = FALSE, warning = FALSE}
+(predict(fit_rf, test))
+```
+
+
+
+
+
